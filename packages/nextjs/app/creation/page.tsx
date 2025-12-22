@@ -9,7 +9,7 @@ export default function CreationPage() {
 
   return (
     <div className="container mx-auto p-8">
-      <h1 className="text-4xl font-bold mb-8">🎨 Create NFT</h1>
+      <h1 className="text-4xl font-bold mb-8">Create NFT</h1>
 
       {/* Шаг 1: Загрузить файл → получить CID */}
       <FileUploader onUploadComplete={setCid} />

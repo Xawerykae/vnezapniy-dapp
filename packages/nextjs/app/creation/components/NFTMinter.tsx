@@ -1,4 +1,7 @@
+"use client";
+
 import { useState } from "react";
+import { useAccount } from "wagmi";
 
 interface NFTMinterProps {
   imageCid: string;
@@ -8,9 +11,16 @@ export default function NFTMinter({ imageCid }: NFTMinterProps) {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const mintNFT = async () => {
+  const { isConnected } = useAccount();
+
+  const createNFT = async () => {
     if (!name) {
       alert("Введите название NFT");
+      return;
+    }
+
+    if (!isConnected) {
+      alert("Подключите кошелек MetaMask!");
       return;
     }
 
@@ -33,15 +43,21 @@ export default function NFTMinter({ imageCid }: NFTMinterProps) {
         body: JSON.stringify(metadata),
       });
 
-      const { cid: metadataCid } = await metadataRes.json();
+      const data = await metadataRes.json();
+      const metadataCid = data.cid;
 
       // 3. Показываем результат
       alert(
-        `NFT готов к минту!\nCID метаданных: ${metadataCid}\n\nСкопируйте этот CID для минта: ipfs://${metadataCid}`,
+        `✅ Метаданные созданы!\n\n` +
+        `CID: ${metadataCid}\n` +
+        `Token URI: ipfs://${metadataCid}\n\n` +
+        `📋 Скопируйте Token URI для минта NFT\n` +
+        `Или используйте кнопку "Mint NFT" в разделе "My NFTs"`
       );
 
-      // Сброс формы
+      // 4. Сброс формы
       setName("");
+
     } catch (error) {
       console.error("Ошибка:", error);
       alert("Что-то пошло не так");
@@ -52,7 +68,7 @@ export default function NFTMinter({ imageCid }: NFTMinterProps) {
 
   return (
     <div className="card bg-base-200 p-6 mt-8">
-      <h3 className="text-xl font-bold mb-4">Шаг 2: Создать NFT</h3>
+      <h3 className="text-xl font-bold mb-4">🎨 Создать NFT</h3>
 
       <div className="mb-4">
         <label className="block mb-2">Название NFT:</label>
@@ -61,7 +77,7 @@ export default function NFTMinter({ imageCid }: NFTMinterProps) {
           placeholder="Мой крутой NFT"
           className="input input-bordered w-full"
           value={name}
-          onChange={e => setName(e.target.value)}
+          onChange={(e) => setName(e.target.value)}
           disabled={loading}
         />
       </div>
@@ -69,18 +85,29 @@ export default function NFTMinter({ imageCid }: NFTMinterProps) {
       <div className="mb-4 p-3 bg-base-300 rounded">
         <p className="text-sm font-semibold">Загруженное изображение:</p>
         <p className="text-xs break-all mt-1">{imageCid}</p>
-        <a href={`https://${imageCid}.ipfs.w3s.link`} target="_blank" className="link text-sm">
+        <a
+          href={`https://${imageCid}.ipfs.w3s.link`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="link text-sm"
+        >
           Посмотреть на IPFS ↗
         </a>
       </div>
 
       <button
-        onClick={mintNFT}
+        onClick={createNFT}
         className={`btn btn-primary w-full ${loading ? "loading" : ""}`}
-        disabled={!name || loading}
+        disabled={!name || loading || !isConnected}
       >
         {loading ? "Создаем..." : "Создать NFT метаданные"}
       </button>
+
+      {!isConnected && (
+        <p className="text-warning text-sm mt-2 text-center">
+          ⚠️ Подключите MetaMask
+        </p>
+      )}
     </div>
   );
 }

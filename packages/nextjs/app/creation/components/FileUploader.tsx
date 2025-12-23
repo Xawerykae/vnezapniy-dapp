@@ -22,7 +22,7 @@ export default function FileUploader({ onUploadComplete }: FileUploaderProps) {
       }
 
       // Проверка типа файла
-      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+      const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
       if (!validTypes.includes(selectedFile.type)) {
         setError("Поддерживаются только изображения (JPEG, PNG, GIF, WebP, SVG)");
         setFile(null);
@@ -44,25 +44,39 @@ export default function FileUploader({ onUploadComplete }: FileUploaderProps) {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("/api/ipfs/upload", {
+      // Используем ключ из переменных окружения
+      const apiKey = process.env.NEXT_PUBLIC_NFT_STORAGE_KEY;
+
+      if (!apiKey) {
+        throw new Error("API key not configured. Please check environment variables.");
+      }
+
+      const response = await fetch("https://api.nft.storage/upload", {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          // Не устанавливаем Content-Type - FormData сделает это автоматически
+        },
         body: formData,
       });
+
+      console.log("Response status:", response.status);
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Upload failed");
+        console.error("NFT.Storage error:", data);
+        throw new Error(data.message || `Upload failed: ${response.status}`);
       }
 
-      setCid(data.cid);
-      setUploadUrl(data.url);
+      const cid = data.value.cid;
+      const url = `https://${cid}.ipfs.nftstorage.link`;
 
-      // Передаем данные родительскому компоненту
-      onUploadComplete(data.cid, data.url, file.name);
+      setCid(cid);
+      setUploadUrl(url);
+      onUploadComplete(cid, url, file.name);
 
       console.log("Upload successful:", data);
-
     } catch (error: any) {
       console.error("Upload error:", error);
       setError(error.message || "Ошибка загрузки файла");
@@ -87,9 +101,7 @@ export default function FileUploader({ onUploadComplete }: FileUploaderProps) {
           disabled={loading}
         />
         <label className="label">
-          <span className="label-text-alt">
-            Supports: JPEG, PNG, GIF, WebP, SVG (max 100MB)
-          </span>
+          <span className="label-text-alt">Supports: JPEG, PNG, GIF, WebP, SVG (max 100MB)</span>
         </label>
       </div>
 
@@ -98,21 +110,13 @@ export default function FileUploader({ onUploadComplete }: FileUploaderProps) {
           <div className="flex items-center space-x-4 mb-4">
             <div className="avatar">
               <div className="w-24 h-24 rounded-lg">
-                <img
-                  src={URL.createObjectURL(file)}
-                  alt="Preview"
-                  className="object-cover w-full h-full"
-                />
+                <img src={URL.createObjectURL(file)} alt="Preview" className="object-cover w-full h-full" />
               </div>
             </div>
             <div>
               <p className="font-semibold">{file.name}</p>
-              <p className="text-sm text-gray-500">
-                Size: {(file.size / 1024 / 1024).toFixed(2)} MB
-              </p>
-              <p className="text-sm text-gray-500">
-                Type: {file.type}
-              </p>
+              <p className="text-sm text-gray-500">Size: {(file.size / 1024 / 1024).toFixed(2)} MB</p>
+              <p className="text-sm text-gray-500">Type: {file.type}</p>
             </div>
           </div>
         </div>
@@ -144,34 +148,21 @@ export default function FileUploader({ onUploadComplete }: FileUploaderProps) {
           <div className="space-y-2">
             <div>
               <p className="text-sm font-semibold">IPFS CID:</p>
-              <code className="break-all bg-base-100 p-2 rounded text-sm block mt-1">
-                {cid}
-              </code>
+              <code className="break-all bg-base-100 p-2 rounded text-sm block mt-1">{cid}</code>
             </div>
 
             <div>
               <p className="text-sm font-semibold">IPFS URL:</p>
-              <a
-                href={uploadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link break-all text-sm"
-              >
+              <a href={uploadUrl} target="_blank" rel="noopener noreferrer" className="link break-all text-sm">
                 {uploadUrl}
               </a>
             </div>
 
             <div className="flex space-x-4 mt-4">
-              <button
-                onClick={() => navigator.clipboard.writeText(cid)}
-                className="btn btn-sm btn-outline"
-              >
+              <button onClick={() => navigator.clipboard.writeText(cid)} className="btn btn-sm btn-outline">
                 📋 Copy CID
               </button>
-              <button
-                onClick={() => navigator.clipboard.writeText(uploadUrl)}
-                className="btn btn-sm btn-outline"
-              >
+              <button onClick={() => navigator.clipboard.writeText(uploadUrl)} className="btn btn-sm btn-outline">
                 🔗 Copy URL
               </button>
             </div>

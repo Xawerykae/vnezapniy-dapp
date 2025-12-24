@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { NFTStorage } from "nft.storage";
 
 // Получаем токен из переменных окружения
-const NFT_STORAGE_TOKEN = process.env.NFT_STORAGE_TOKEN || process.env.NEXT_PUBLIC_NFT_STORAGE_TOKEN;
+const NFT_STORAGE_KEY = process.env.NFT_STORAGE_KEY || process.env.NEXT_PUBLIC_NFT_STORAGE_KEY;
 
 export async function POST(request: NextRequest) {
   try {
     // Проверяем наличие токена
-    if (!NFT_STORAGE_TOKEN) {
+    if (!NFT_STORAGE_KEY) {
       console.error("NFT_STORAGE_TOKEN не настроен");
       return NextResponse.json({ error: "IPFS service not configured" }, { status: 500 });
     }
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     console.log("Uploading file to NFT.Storage:", file.name, file.size);
 
     // Создаем клиент NFT.Storage
-    const client = new NFTStorage({ token: NFT_STORAGE_TOKEN });
+    const client = new NFTStorage({ token: NFT_STORAGE_KEY });
 
     // Загружаем файл
     const cid = await client.storeBlob(file);

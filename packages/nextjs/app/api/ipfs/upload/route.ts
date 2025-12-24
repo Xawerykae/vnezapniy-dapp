@@ -1,101 +1,67 @@
-"use server";
+import { NextRequest, NextResponse } from "next/server";
+import { NFTStorage } from "nft.storage";
 
-import { NFTStorage } from 'nft.storage';
-
+// Получаем токен из переменных окружения
 const NFT_STORAGE_TOKEN = process.env.NFT_STORAGE_TOKEN || process.env.NEXT_PUBLIC_NFT_STORAGE_TOKEN;
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const contentType = request.headers.get("content-type") || "";
-
+    // Проверяем наличие токена
     if (!NFT_STORAGE_TOKEN) {
       console.error("NFT_STORAGE_TOKEN не настроен");
-      return Response.json(
-        { error: "IPFS service not configured" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "IPFS service not configured" }, { status: 500 });
     }
 
+    // Проверяем тип контента
+    const contentType = request.headers.get("content-type") || "";
+
+    if (!contentType.includes("multipart/form-data")) {
+      return NextResponse.json({ error: "Unsupported content type. Use multipart/form-data" }, { status: 400 });
+    }
+
+    // Получаем данные формы
+    const formData = await request.formData();
+    const file = formData.get("file") as File;
+
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    console.log("Uploading file to NFT.Storage:", file.name, file.size);
+
+    // Создаем клиент NFT.Storage
     const client = new NFTStorage({ token: NFT_STORAGE_TOKEN });
 
-    if (contentType.includes("multipart/form-data")) {
-      // Загрузка файла (изображения)
-      const formData = await request.formData();
-      const file = formData.get("file") as File;
+    // Загружаем файл
+    const cid = await client.storeBlob(file);
+    const url = `https://${cid}.ipfs.nftstorage.link`;
 
-      if (!file) {
-        return Response.json(
-          { error: "No file provided" },
-          { status: 400 }
-        );
-      }
+    console.log("✅ File uploaded successfully. CID:", cid);
 
-      console.log("Uploading file to NFT.Storage:", file.name, file.size);
-
-      // Загружаем файл в NFT.Storage
-      const cid = await client.storeBlob(file);
-
-      console.log("File uploaded successfully, CID:", cid);
-
-      return Response.json({
-        cid,
-        url: `https://${cid}.ipfs.nftstorage.link`,
-        gatewayUrl: `https://ipfs.io/ipfs/${cid}`,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        timestamp: new Date().toISOString()
-      });
-
-    } else if (contentType.includes("application/json")) {
-      // Загрузка метаданных NFT
-      const metadata = await request.json();
-
-      console.log("Uploading metadata to NFT.Storage:", metadata);
-
-      // Создаем метаданные NFT
-      const nftMetadata = {
-        name: metadata.name || "My NFT",
-        description: metadata.description || "Created with my dApp",
-        image: metadata.image,
-        attributes: metadata.attributes || [],
-        createdBy: metadata.createdBy || "anonymous",
-        createdAt: new Date().toISOString()
-      };
-
-      // Загружаем метаданные
-      const metadataBlob = new Blob([JSON.stringify(nftMetadata)], {
-        type: "application/json"
-      });
-
-      const cid = await client.storeBlob(metadataBlob);
-
-      console.log("Metadata uploaded successfully, CID:", cid);
-
-      return Response.json({
-        cid,
-        url: `https://${cid}.ipfs.nftstorage.link`,
-        gatewayUrl: `https://ipfs.io/ipfs/${cid}`,
-        metadata: nftMetadata,
-        timestamp: new Date().toISOString()
-      });
-
-    } else {
-      return Response.json(
-        { error: "Unsupported content type" },
-        { status: 400 }
-      );
-    }
-
+    return NextResponse.json({
+      success: true,
+      cid,
+      url,
+      gatewayUrl: url,
+    });
   } catch (error: any) {
-    console.error("NFT.Storage upload error:", error);
+    console.error("❌ Error in upload route:", error);
 
-    return Response.json(
+    return NextResponse.json(
       {
         error: "Upload failed",
-        details: error.message
+        details: process.env.NODE_ENV === "development" ? error.message : undefined,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
+
+// Опционально: настройки для увеличения лимита размера файла
+export const config = {
+  api: {
+    bodyParser: false,
+    // Увеличиваем лимит до 100MB
+    responseLimit: "100mb",
+  },
+};

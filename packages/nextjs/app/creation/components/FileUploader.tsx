@@ -59,9 +59,17 @@ export default function FileUploader({ onUploadComplete }: FileUploaderProps) {
     setLoading(true);
     setError("");
 
+    // 🔴 ДОБАВЛЕН ОТЛАДОЧНЫЙ КОД
+    console.log("🟡 [FileUploader] Начинаю загрузку файла:", file.name);
+    console.log("🟡 [FileUploader] Размер файла:", file.size, "байт");
+    console.log("🟡 [FileUploader] Тип файла:", file.type);
+
     try {
       const formData = new FormData();
       formData.append("file", file);
+
+      // 🔴 ДОБАВЛЕН ОТЛАДОЧНЫЙ КОД
+      console.log("🟡 [FileUploader] FormData создан. Отправляю запрос на /api/ipfs/upload");
 
       // Используем ваш API endpoint
       const response = await fetch("/api/ipfs/upload", {
@@ -69,7 +77,14 @@ export default function FileUploader({ onUploadComplete }: FileUploaderProps) {
         body: formData,
       });
 
+      // 🔴 ДОБАВЛЕН ОТЛАДОЧНЫЙ КОД
+      console.log("🟡 [FileUploader] Ответ получен. Статус:", response.status);
+      console.log("🟡 [FileUploader] Заголовки ответа:", Object.fromEntries(response.headers.entries()));
+
       const data = await response.json();
+
+      // 🔴 ДОБАВЛЕН ОТЛАДОЧНЫЙ КОД
+      console.log("🟡 [FileUploader] Данные ответа:", data);
 
       if (!response.ok) {
         throw new Error(data.error || "Upload failed");
@@ -79,8 +94,15 @@ export default function FileUploader({ onUploadComplete }: FileUploaderProps) {
       setUploadUrl(data.url);
       onUploadComplete(data.cid, data.url, file.name);
 
+      // 🔴 ДОБАВЛЕН ОТЛАДОЧНЫЙ КОД
+      console.log("✅ [FileUploader] Успешно! CID:", data.cid);
+
     } catch (error: any) {
-      console.error("Upload error:", error);
+      // 🔴 ДОБАВЛЕН ОТЛАДОЧНЫЙ КОД
+      console.error("🔴 [FileUploader] Ошибка загрузки:", error);
+      console.error("🔴 [FileUploader] Сообщение об ошибке:", error.message);
+      console.error("🔴 [FileUploader] Стек ошибки:", error.stack);
+
       setError(error.message || "Ошибка загрузки файла");
     } finally {
       setLoading(false);

@@ -21,8 +21,8 @@ describe("🚩 Challenge: 🎟 Tokenization 🤓", function () {
     }
 
     it("Should deploy the contract", async function () {
-      const YourCollectible = await ethers.getContractFactory(contractArtifact);
-      myContract = await YourCollectible.deploy();
+      const YourCollectibleFactory = await ethers.getContractFactory(contractArtifact);
+      myContract = (await YourCollectibleFactory.deploy()) as YourCollectible;
       console.log("\t", " 🛰  Contract deployed on", await myContract.getAddress());
     });
 

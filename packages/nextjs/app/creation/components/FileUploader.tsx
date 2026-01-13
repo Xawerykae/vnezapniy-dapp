@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
 
 interface FileUploaderProps {
   onUploadComplete: (cid: string, url: string, fileName: string) => void;
@@ -9,40 +8,49 @@ interface FileUploaderProps {
 
 export default function FileUploader({ onUploadComplete }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [cid, setCid] = useState<string>("");
+  const [uploadUrl, setUploadUrl] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string>("");
 
-  // Создаем и очищаем превью (как у друга)
+  // Очистка blob URL
   useEffect(() => {
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setPreview(null);
-    }
-  }, [file]);
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
 
-    // Проверки как у друга + ваши
-    if (!selectedFile.type.startsWith("image/")) {
-      setError("Выберите файл изображения");
-      return;
+    // Очищаем предыдущий URL
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
     }
 
-    if (selectedFile.size > 100 * 1024 * 1024) {
-      setError("Файл должен быть меньше 100MB");
-      return;
-    }
+    if (selectedFile) {
+      if (selectedFile.size > 100 * 1024 * 1024) {
+        setError("Файл слишком большой. Максимум 100MB");
+        setFile(null);
+        return;
+      }
 
-    setFile(selectedFile);
-    setError("");
+      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+      if (!validTypes.includes(selectedFile.type)) {
+        setError("Поддерживаются только изображения (JPEG, PNG, GIF, WebP, SVG)");
+        setFile(null);
+        return;
+      }
+
+      setFile(selectedFile);
+      const url = URL.createObjectURL(selectedFile);
+      setPreviewUrl(url);
+      setError("");
+    }
   };
 
   const uploadToIPFS = async () => {
@@ -55,6 +63,7 @@ export default function FileUploader({ onUploadComplete }: FileUploaderProps) {
       const formData = new FormData();
       formData.append("file", file);
 
+      // Используем ваш API endpoint
       const response = await fetch("/api/ipfs/upload", {
         method: "POST",
         body: formData,
@@ -66,70 +75,86 @@ export default function FileUploader({ onUploadComplete }: FileUploaderProps) {
         throw new Error(data.error || "Upload failed");
       }
 
+      setCid(data.cid);
+      setUploadUrl(data.url);
       onUploadComplete(data.cid, data.url, file.name);
+
     } catch (error: any) {
       console.error("Upload error:", error);
-      setError(error.message || "Ошибка загрузки");
+      setError(error.message || "Ошибка загрузки файла");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-md">
-      <div className="form-control w-full">
+    <div className="card bg-base-200 shadow-xl p-6 max-w-2xl mx-auto">
+      <h2 className="text-2xl font-bold mb-6">📤 Upload Image to IPFS</h2>
+
+      <div className="form-control mb-4">
         <label className="label">
-          <span className="label-text font-semibold">Upload NFT Image</span>
+          <span className="label-text">Choose an image for your NFT</span>
         </label>
-
-        {/* UI как у друга */}
-        <label className="border-2 border-dashed border-gray-400 rounded-lg p-8 cursor-pointer hover:border-gray-600 transition text-center">
-          {preview ? (
-            <div className="relative w-full h-64">
-              <Image
-                src={preview}
-                alt="Preview"
-                fill
-                className="object-contain"
-                unoptimized
-              />
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-12 h-12 text-gray-400">📷</div>
-              <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-              <p className="text-xs text-gray-500">PNG, JPG, GIF up to 100MB</p>
-            </div>
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            disabled={loading}
-            className="hidden"
-          />
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="file-input file-input-bordered file-input-primary w-full"
+          disabled={loading}
+        />
+        <label className="label">
+          <span className="label-text-alt">
+            Supports: JPEG, PNG, GIF, WebP, SVG (max 100MB)
+          </span>
         </label>
+      </div>
 
-        {file && (
-          <p className="label-text-alt mt-2 text-sm">
-            Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-          </p>
-        )}
-
-        {error && (
-          <div className="alert alert-error mt-4">
-            <span>{error}</span>
+      {previewUrl && (
+        <div className="mb-6">
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="avatar">
+              <div className="w-24 h-24 rounded-lg">
+                <img
+                  src={previewUrl}
+                  alt="Preview"
+                  className="object-cover w-full h-full rounded-lg"
+                />
+              </div>
+            </div>
+            <div>
+              <p className="font-semibold">{file?.name}</p>
+              <p className="text-sm text-gray-500">
+                Size: {file ? (file.size / 1024 / 1024).toFixed(2) : 0} MB
+              </p>
+              <p className="text-sm text-gray-500">
+                Type: {file?.type}
+              </p>
+            </div>
           </div>
-        )}
+        </div>
+      )}
 
+      {error && (
+        <div className="alert alert-error mb-4">
+          <span>{error}</span>
+        </div>
+      )}
+
+      <div className="form-control">
         <button
           onClick={uploadToIPFS}
-          className={`btn btn-primary mt-4 ${loading ? "loading" : ""}`}
+          className={`btn btn-primary ${loading ? "loading" : ""}`}
           disabled={!file || loading}
         >
           {loading ? "Uploading to IPFS..." : "🚀 Upload to IPFS"}
         </button>
       </div>
+
+      {cid && (
+        <div className="mt-6 p-4 bg-success/10 rounded-lg">
+          {/* ... остальной код для отображения CID */}
+        </div>
+      )}
     </div>
   );
 }

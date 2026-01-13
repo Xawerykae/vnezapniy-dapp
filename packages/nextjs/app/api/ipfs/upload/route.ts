@@ -1,52 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
+import { NFTStorage } from "nft.storage";
+
+const NFT_STORAGE_KEY = process.env.NEXT_PUBLIC_NFT_STORAGE_KEY;
 
 export async function POST(request: NextRequest) {
-  console.log("🟢 [1] Эндпоинт /api/ipfs/upload ВЫЗВАН");
-
   try {
-    // 1. Читаем запрос
+    // 1. Проверяем ключ
+    if (!NFT_STORAGE_KEY) {
+      console.error("❌ NFT_STORAGE_KEY не настроен");
+      return NextResponse.json({ error: "IPFS service not configured" }, { status: 500 });
+    }
+
+    // 2. Получаем файл
     const formData = await request.formData();
     const file = formData.get("file") as File;
 
-    console.log("📁 [2] Получен файл:", file ? file.name : "НЕТ");
-
-    // 2. Проверяем переменные окружения
-    const myKey = process.env.NEXT_PUBLIC_NFT_STORAGE_KEY;
-    console.log("🔑 [3] Ключ из Vercel:", myKey ? "ЕСТЬ" : "НЕТ");
-    if (myKey) {
-      console.log("   Длина:", myKey.length);
-      console.log("   Начало:", myKey.substring(0, 10) + "...");
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // 3. Формируем простой ответ БЕЗ NFT.Storage
-    const responseData = {
+    console.log("🚀 Загружаем файл в NFT.Storage:", file.name);
+
+    // 3. ЗАГРУЖАЕМ В IPFS (РАБОЧИЙ КОД)
+    const client = new NFTStorage({ token: NFT_STORAGE_KEY });
+    const cid = await client.storeBlob(file);
+    const url = `https://${cid}.ipfs.nftstorage.link`;
+
+    console.log("✅ Успех! CID:", cid);
+
+    // 4. Возвращаем настоящий CID
+    return NextResponse.json({
       success: true,
-      debug: true,
-      message: "✅ Диагностика: файл получен сервером.",
-      fileInfo: file
-        ? {
-            name: file.name,
-            size: file.size,
-            type: file.type,
-          }
-        : null,
-      envKeyExists: !!myKey,
-      timestamp: new Date().toISOString(),
-    };
+      cid, // ← НАСТОЯЩИЙ CID
+      url,
+      gatewayUrl: url,
+      fileName: file.name
+    });
 
-    console.log("📤 [4] Отправляю ответ:", responseData);
-
-    // 4. Отвечаем
-    return NextResponse.json(responseData);
   } catch (error: any) {
-    console.error("💥 [5] Ошибка при разборе запроса:", error.message);
+    console.error("❌ Ошибка NFT.Storage:", error);
+
+    // Подробная ошибка для отладки
     return NextResponse.json(
       {
-        success: false,
-        error: "Серверная ошибка",
-        details: error.message,
+        error: "Upload failed",
+        message: error.message,
+        details: process.env.NODE_ENV === "development" ? error.stack : undefined
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
